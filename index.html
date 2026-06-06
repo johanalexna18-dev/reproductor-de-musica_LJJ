@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleek Music Player Pro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght=300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 12px #1db954); }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        .player-init-anim {
+            transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.8s ease !important;
+            opacity: 0 !important;
+            transform: scale(0.95) !important;
+        }
+
+        .player-active-anim {
+            opacity: 1 !important;
+            transform: scale(1) !important;
+        }
+
+        .btn-like {
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .btn-like:active {
+            transform: scale(1.2);
+        }
+
+        /* NUEVOS ESTILOS PARA EL MODULO DE BUSQUEDA */
+        .seccion-busqueda {
+            display: none;
+            flex-direction: column;
+            gap: 24px;
+            padding: 20px;
+            width: 100%;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .seccion-busqueda.activa {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .search-bar-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .search-bar-container i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a7a7a7;
+            font-size: 18px;
+        }
+
+        .input-buscar {
+            width: 100%;
+            padding: 14px 14px 14px 45px;
+            background: #24242e;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 30px;
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            outline: none;
+            transition: border 0.3s, background 0.3s;
+        }
+
+        .input-buscar:focus {
+            border-color: #1db954;
+            background: #2a2a36;
+        }
+
+        .grid-generos {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 16px;
+            margin-top: 10px;
+        }
+
+        .tarjeta-genero {
+            padding: 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+            cursor: pointer;
+            height: 100px;
+            display: flex;
+            align-items: flex-end;
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .tarjeta-genero:hover {
+            transform: scale(1.04);
+        }
+
+        /* Ocultar dinámicamente el reproductor central original */
+        .contenido-reproductor-dinamico {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .contenido-oculto {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="pantalla-bienvenida" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f0f13; display: flex; justify-content: center; align-items: center; z-index: 9999; transition: all 0.8s cubic-bezier(0.25, 1, 0.5, 1); font-family: 'Inter', sans-serif;">
+        <div style="text-align: center; background: #1a1a24; padding: 40px 60px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05);">
+            <div style="color: #1db954; font-size: 48px; margin-bottom: 20px; animation: pulse 2s infinite;">
+                <i class="fa-solid fa-wave-square"></i>
+            </div>
+            <h2 style="color: #ffffff; margin: 0 0 10px 0; font-size: 28px; letter-spacing: 2px; font-weight: 700;">BEATSTREAM <span style="color: #1db954; font-size: 14px; vertical-align: super; font-weight: 400;">PRO</span></h2>
+            <p style="color: #a7a7a7; margin: 0 0 30px 0; font-size: 15px;">Tu música, tu ritmo, tu espacio.</p>
+            <button id="btn-entrar" style="background: #1db954; color: #ffffff; border: none; padding: 14px 36px; font-size: 16px; font-weight: 600; border-radius: 30px; cursor: pointer; transition: transform 0.2s ease, background 0.2s ease; box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);">
+                Entrar al Reproductor <i class="fa-solid fa-arrow-right" style="margin-left: 8px;"></i>
+            </button>
+        </div>
+    </div>
+
+    <audio id="audio-principal" src="audio/Anuel AA- Esa Cruz- (Audio Oficial).mp3"></audio>
+
+    <main class="player-card player-init-anim" id="app-player">
+        
+        <nav class="web-sidebar">
+            <div class="sidebar-menu">
+                <a href="#" class="menu-opcion activa" id="menu-inicio"><i class="fa-solid fa-house"></i> Inicio</a>
+                <a href="#" class="menu-opcion" id="menu-buscar"><i class="fa-solid fa-magnifying-glass"></i> Buscar</a>
+                <a href="#" class="menu-opcion"><i class="fa-solid fa-book-open"></i> Tu Biblioteca</a>
+                
+                <div class="separador"></div>
+                
+                <a href="#" class="menu-opcion" id="menu-favoritos"><i class="fa-solid fa-heart"></i> Tus Me Gusta</a>
+                <a href="#" class="menu-opcion"><i class="fa-solid fa-compact-disc"></i> Álbumes</a>
+                <a href="#" class="menu-opcion"><i class="fa-solid fa-gear"></i> Ajustes</a>
+            </div>
+        </nav>
+
+        <header class="player-header">
+            <div class="brand-title">
+                <i class="fa-solid fa-wave-square"></i> 
+                <span>BEATSTREAM <small>PRO</small></span>
+            </div>
+            <div class="header-text">
+                <span class="subtitle">REPRODUCIENDO DESDE PLAYLIST</span>
+                <span class="playlist-name" id="current-playlist">Mi Playlist Favorita</span>
+            </div>
+            <button class="btn-icon" id="btn-options" aria-label="Opciones"><i class="fa-solid fa-ellipsis"></i></button>
+        </header>
+
+        <div class="left-panel contenido-reproductor-dinamico" id="panel-reproductor-central">
+            
+            <section class="visual-container">
+                <div class="album-art-wrapper">
+                    <img src="image_f083a6.jpg" alt="Portada del álbum" id="album-cover">
+                </div>
+            </section>
+
+            <section class="track-meta">
+                <div class="track-info">
+                    <h1 class="track-title" id="track-title">TÍTULO CANCIÓN 1</h1>
+                    <p class="track-artist" id="track-artist">NOMBRE DEL ARTISTA 1</p>
+                </div>
+                <button class="btn-icon btn-like" id="btn-favorite" aria-label="Me gusta">
+                    <i class="fa-regular fa-heart"></i>
+                </button>
+            </section>
+
+            <section class="timeline-container">
+                <div class="progress-wrapper">
+                    <input type="range" id="progress-slider" min="0" max="100" value="0" step="0.1" aria-label="Progreso de la canción">
+                </div>
+                <div class="time-stamps">
+                    <span id="time-current">0:00</span>
+                    <span id="time-total">--:--</span>
+                </div>
+            </section>
+
+            <section class="playback-controls">
+                <button class="btn-icon secondary-ctrl" id="btn-shuffle" title="Aleatorio"><i class="fa-solid fa-shuffle"></i></button>
+                <button class="btn-icon primary-ctrl" id="btn-prev" title="Anterior"><i class="fa-solid fa-backward-step"></i></button>
+                <button class="btn-icon main-play-trigger" id="play" title="Reproducir"><i class="fa-solid fa-play"></i></button>
+                <button class="btn-icon primary-ctrl" id="btn-next" title="Siguiente"><i class="fa-solid fa-forward-step"></i></button>
+                <button class="btn-icon secondary-ctrl" id="btn-repeat" title="Repetir"><i class="fa-solid fa-repeat"></i></button>
+            </section>
+
+            <footer class="player-utilities">
+                <div class="volume-module">
+                    <i class="fa-solid fa-volume-high" id="volume-icon"></i>
+                    <input type="range" id="volume-control" min="0" max="100" value="70" aria-label="Volumen">
+                </div>
+                <button class="btn-icon" id="btn-toggle-playlist" title="Ver cola de reproducción">
+                    <i class="fa-solid fa-list-ul"></i>
+                </button>
+            </footer>
+
+        </div>
+
+        <div class="left-panel seccion-busqueda" id="panel-buscar-central" style="background: transparent;">
+            <h2 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">Buscar</h2>
+            <div class="search-bar-container">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="input-buscar" id="input-buscador-musica" placeholder="¿Qué quieres escuchar hoy?">
+            </div>
+            
+            <h3 style="color: white; margin: 10px 0 0 0; font-size: 18px; font-weight: 600;">Explorar todo</h3>
+            <div class="grid-generos">
+                <div class="tarjeta-genero" style="background: #e8115b;">Pop</div>
+                <div class="tarjeta-genero" style="background: #148a08;">Urbano</div>
+                <div class="tarjeta-genero" style="background: #bc461a;">Hip-Hop</div>
+                <div class="tarjeta-genero" style="background: #7d4b32;">Reggae</div>
+            </div>
+        </div>
+
+        <aside class="playlist-panel" id="playlist-panel">
+            <div class="playlist-header">
+                <h3 id="playlist-panel-title"><i class="fa-solid fa-list-ul"></i> Próximas canciones</h3>
+            </div>
+            
+            <ol class="queue-list" id="queue-list">
+                
+                <li class="queue-item active" onclick="seleccionarCancion(this)"
+                    data-id="cancion_1"
+                    data-src="audio/Anuel AA- Esa Cruz- (Audio Oficial).mp3" 
+                    data-cover="image_f083a6.jpg"
+                    data-title="TÍTULO CANCIÓN 1" 
+                    data-artist="NOMBRE DEL ARTISTA 1">
+                    <span class="index">1</span>
+                    <div class="item-details">
+                        <span class="item-title">TÍTULO CANCIÓN 1</span>
+                        <span class="item-artist">NOMBRE DEL ARTISTA 1</span>
+                    </div>
+                    <div class="playing-animation">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="item-duration">--:--</span>
+                </li>
+
+                <li class="queue-item" onclick="seleccionarCancion(this)"
+                    data-id="cancion_2"
+                    data-src="audio/BAD BUNNY X DRAKE Mia (Video Oficial).mp3" 
+                    data-cover="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500"
+                    data-title="TÍTULO CANCIÓN 2" 
+                    data-artist="NOMBRE DEL ARTISTA 2">
+                    <span class="index">2</span>
+                    <div class="item-details">
+                        <span class="item-title">TÍTULO CANCIÓN 2</span>
+                        <span class="item-artist">NOMBRE DEL ARTISTA 2</span>
+                    </div>
+                    <div class="playing-animation">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="item-duration">--:--</span>
+                </li>
+
+                <li class="queue-item" onclick="seleccionarCancion(this)"
+                    data-id="cancion_3"
+                    data-src="audio/MYke Towers - La playa (Video Oficial).mp3" 
+                    data-cover="https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500"
+                    data-title="TÍTULO CANCIÓN 3" 
+                    data-artist="NOMBRE DEL ARTISTA 3">
+                    <span class="index">3</span>
+                    <div class="item-details">
+                        <span class="item-title">TÍTULO CANCIÓN 3</span>
+                        <span class="item-artist">NOMBRE DEL ARTISTA 3</span>
+                    </div>
+                    <div class="playing-animation">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="item-duration">--:--</span>
+                </li>
+
+                <li class="queue-item" onclick="seleccionarCancion(this)"
+                    data-id="cancion_4"
+                    data-src="audio/Panti y COLALE - EL ALFA EL jefe, DE La Ghetto,Zion,El Cherry,DJChuloNYC,Ronny GTA, Ezzy R.mp3" 
+                    data-cover="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500"
+                    data-title="TÍTULO CANCIÓN 4" 
+                    data-artist="NOMBRE DEL ARTISTA 4">
+                    <span class="index">4</span>
+                    <div class="item-details">
+                        <span class="item-title">TÍTULO CANCIÓN 4</span>
+                        <span class="item-artist">NOMBRE DEL ARTISTA 4</span>
+                    </div>
+                    <div class="playing-animation">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="item-duration">--:--</span>
+                </li>
+
+            </ol>
+        </aside>
+
+    </main>
+
+    <script>
+        let audio, btnPlay, trackTitle, trackArtist, albumCover, btnFavorite;
+        
+        let cancionesFavoritas = new Set();
+        let modoVistaActual = "inicio";
+
+        document.addEventListener("DOMContentLoaded", () => {
+            audio = document.getElementById("audio-principal");
+            btnPlay = document.getElementById("play");
+            trackTitle = document.getElementById("track-title");
+            trackArtist = document.getElementById("track-artist");
+            albumCover = document.getElementById("album-cover");
+            btnFavorite = document.getElementById("btn-favorite");
+
+            const pantallaBienvenida = document.getElementById("pantalla-bienvenida");
+            const btnEntrar = document.getElementById("btn-entrar");
+            const appPlayer = document.getElementById("app-player");
+
+            const menuInicio = document.getElementById("menu-inicio");
+            const menuFavoritos = document.getElementById("menu-favoritos");
+            const menuBuscar = document.getElementById("menu-buscar");
+
+            const panelReproductor = document.getElementById("panel-reproductor-central");
+            const panelBuscar = document.getElementById("panel-buscar-central");
+            const inputBuscador = document.getElementById("input-buscador-musica");
+
+            // Entrada al reproductor
+            if (btnEntrar && pantallaBienvenida && appPlayer) {
+                btnEntrar.addEventListener("mouseenter", () => {
+                    btnEntrar.style.transform = "scale(1.05)";
+                    btnEntrar.style.background = "#1ed760";
+                });
+                btnEntrar.addEventListener("mouseleave", () => {
+                    btnEntrar.style.transform = "scale(1)";
+                    btnEntrar.style.background = "#1db954";
+                });
+
+                btnEntrar.addEventListener("click", () => {
+                    pantallaBienvenida.style.opacity = "0";
+                    pantallaBienvenida.style.transform = "translateY(-30px) scale(1.02)";
+                    pantallaBienvenida.style.visibility = "hidden";
+
+                    appPlayer.classList.add("player-active-anim");
+
+                    setTimeout(() => {
+                        if (pantallaBienvenida.parentNode) {
+                            pantallaBienvenida.parentNode.removeChild(pantallaBienvenida);
+                        }
+                    }, 800);
+                });
+            }
+
+            // Reproducir / Pausar
+            if (btnPlay && audio) {
+                btnPlay.addEventListener("click", () => {
+                    if (audio.paused) {
+                        audio.play()
+                            .then(() => {
+                                btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                            })
+                            .catch(error => console.error("Error de reproducción:", error));
+                    } else {
+                        audio.pause();
+                        btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>';
+                    }
+                });
+            }
+
+            // Lógica del botón "Me Gusta"
+            if (btnFavorite) {
+                btnFavorite.addEventListener("click", () => {
+                    const cancionActiva = document.querySelector(".queue-list .queue-item.active");
+                    if (!cancionActiva) return;
+
+                    const cancionId = cancionActiva.getAttribute("data-id");
+                    const iconoCorazon = btnFavorite.querySelector("i");
+
+                    if (cancionesFavoritas.has(cancionId)) {
+                        cancionesFavoritas.delete(cancionId);
+                        iconoCorazon.className = "fa-regular fa-heart";
+                        btnFavorite.style.color = "";
+                    } else {
+                        cancionesFavoritas.add(cancionId);
+                        iconoCorazon.className = "fa-solid fa-heart";
+                        btnFavorite.style.color = "#1db954";
+                    }
+
+                    if (modoVistaActual === "favoritos") {
+                        actualizarListaVisualFavoritos();
+                    }
+                });
+            }
+
+            // EVENTO CLICK: MENÚ INICIO
+            if (menuInicio) {
+                menuInicio.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    modoVistaActual = "inicio";
+                    
+                    document.querySelectorAll(".sidebar-menu .menu-opcion").forEach(op => op.classList.remove("activa"));
+                    menuInicio.classList.add("activa");
+                    
+                    document.getElementById("playlist-panel-title").innerHTML = '<i class="fa-solid fa-list-ul"></i> Próximas canciones';
+                    document.getElementById("current-playlist").textContent = "Mi Playlist Favorita";
+
+                    // Animación para regresar el reproductor central original
+                    panelBuscar.classList.remove("activa");
+                    setTimeout(() => {
+                        panelBuscar.classList.add("contenido-oculto");
+                        panelReproductor.classList.remove("contenido-oculto");
+                        panelReproductor.style.opacity = "1";
+                    }, 200);
+
+                    document.querySelectorAll(".queue-list .queue-item").forEach(item => {
+                        item.style.display = "flex";
+                    });
+                });
+            }
+
+            // EVENTO CLICK: MENÚ BUSCAR (Con animación fluida de paneles)
+            if (menuBuscar) {
+                menuBuscar.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    modoVistaActual = "buscar";
+
+                    document.querySelectorAll(".sidebar-menu .menu-opcion").forEach(op => op.classList.remove("activa"));
+                    menuBuscar.classList.add("activa");
+
+                    document.getElementById("playlist-panel-title").innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Resultados';
+                    document.getElementById("current-playlist").textContent = "Buscador de música";
+
+                    // Desvanecer reproductor central y mostrar barra de búsqueda de manera profesional
+                    panelReproductor.style.opacity = "0";
+                    setTimeout(() => {
+                        panelReproductor.classList.add("contenido-oculto");
+                        panelBuscar.classList.remove("contenido-oculto");
+                        // Forzar reflujo para activar animación CSS
+                        panelBuscar.offsetHeight; 
+                        panelBuscar.classList.add("activa");
+                        inputBuscador.focus(); // Auto focus al input
+                    }, 200);
+                });
+            }
+
+            // LÓGICA DE FILTRADO EN TIEMPO REAL DEL BUSCADOR
+            if (inputBuscador) {
+                inputBuscador.addEventListener("input", (e) => {
+                    const textoBusqueda = e.target.value.toLowerCase().trim();
+                    const canciones = document.querySelectorAll(".queue-list .queue-item");
+
+                    canciones.forEach(cancion => {
+                        const titulo = cancion.getAttribute("data-title").toLowerCase();
+                        const artista = cancion.getAttribute("data-artist").toLowerCase();
+
+                        // Si coincide el título o el artista, la muestra; si no, la oculta con suavidad
+                        if (titulo.includes(textoBusqueda) || artista.includes(textoBusqueda)) {
+                            cancion.style.display = "flex";
+                        } else {
+                            cancion.style.display = "none";
+                        }
+                    });
+                });
+            }
+
+            // Menú Lateral: Tus Me Gusta
+            if (menuFavoritos) {
+                menuFavoritos.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    modoVistaActual = "favoritos";
+
+                    document.querySelectorAll(".sidebar-menu .menu-opcion").forEach(op => op.classList.remove("activa"));
+                    menuFavoritos.classList.add("activa");
+
+                    document.getElementById("playlist-panel-title").innerHTML = '<i class="fa-solid fa-heart"></i> Mis Favoritas';
+                    document.getElementById("current-playlist").textContent = "Tus Me Gusta";
+
+                    // Asegurar que el reproductor normal se vea si venías de buscar
+                    panelBuscar.classList.remove("activa");
+                    panelBuscar.classList.add("contenido-oculto");
+                    panelReproductor.classList.remove("contenido-oculto");
+                    panelReproductor.style.opacity = "1";
+
+                    actualizarListaVisualFavoritos();
+                });
+            }
+        });
+
+        function actualizarListaVisualFavoritos() {
+            document.querySelectorAll(".queue-list .queue-item").forEach(item => {
+                const cancionId = item.getAttribute("data-id");
+                if (cancionesFavoritas.has(cancionId)) {
+                    item.style.display = "flex";
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        }
+
+        function seleccionarCancion(elemento) {
+            if (!audio || !btnPlay) return;
+
+            const nuevaRuta = elemento.getAttribute("data-src");
+            const nuevoTitulo = elemento.getAttribute("data-title");
+            const nuevoArtista = elemento.getAttribute("data-artist");
+            const nuevaPortada = elemento.getAttribute("data-cover");
+            const cancionId = elemento.getAttribute("data-id");
+
+            audio.src = nuevaRuta;
+            trackTitle.textContent = nuevoTitulo;
+            trackArtist.textContent = nuevoArtista;
+            albumCover.src = nuevaPortada;
+
+            const iconoCorazon = btnFavorite.querySelector("i");
+            if (cancionesFavoritas.has(cancionId)) {
+                iconoCorazon.className = "fa-solid fa-heart";
+                btnFavorite.style.color = "#1db954";
+            } else {
+                iconoCorazon.className = "fa-regular fa-heart";
+                btnFavorite.style.color = "";
+            }
+
+            document.querySelectorAll(".queue-list .queue-item").forEach(item => {
+                item.classList.remove("active");
+            });
+            elemento.classList.add("active");
+
+            audio.play()
+                .then(() => {
+                    btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                })
+                .catch(error => {
+                    console.error("Error al iniciar reproducción automática:", error);
+                });
+        }
+    </script>
+</body>
+</html>
